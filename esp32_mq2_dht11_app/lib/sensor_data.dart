@@ -4,7 +4,8 @@ class SensorData {
   final String time;
   final double temperature;
   final double humidity;
-  final String gas;
+  final double gas;
+  //final String gas;
 
   SensorData({
     required this.id,
@@ -22,7 +23,8 @@ class SensorData {
       time: json['time'],
       temperature: double.parse(json['temperature']),
       humidity: double.parse(json['humidity']),
-      gas: json['gas'] ?? 'Unknown', // ตรวจสอบว่ามีค่า gas หรือไม่
+       gas: double.parse(json['gas'].toString()), // Parse gas as double
+     // gas: json['gas'] ?? 'Unknown', // ตรวจสอบว่ามีค่า gas หรือไม่
     );
   }
 }

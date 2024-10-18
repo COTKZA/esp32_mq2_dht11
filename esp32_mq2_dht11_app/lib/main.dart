@@ -56,7 +56,7 @@ class HomePage extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => GasPage()),
+                      MaterialPageRoute(builder: (context) => GasDataDisplay()),
                     );
                   },
                   child: Text('Go to Gas Page'),
@@ -75,7 +75,8 @@ class HomePage extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => HumidityPage()),
+                      MaterialPageRoute(
+                          builder: (context) => HumidityDataDisplay()),
                     );
                   },
                   child: Text('Go to Humidity Page'),
@@ -94,7 +95,8 @@ class HomePage extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => TempPage()),
+                      MaterialPageRoute(
+                          builder: (context) => tempDataDisplay()),
                     );
                   },
                   child: Text('Go to Temperature Page'),

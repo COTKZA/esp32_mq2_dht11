@@ -1,9 +1,8 @@
-// main.dart
-import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_gauges/gauges.dart';
-import 'api.dart';
-import 'sensor_data.dart';
+import 'dart:async';
 
 void main() {
   runApp(MyApp());
@@ -14,27 +13,71 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: tempDataDisplay(),
+      home: SensorDataDisplay(),
     );
   }
 }
 
-class tempDataDisplay extends StatefulWidget {
-  @override
-  _tempDataDisplayState createState() => _tempDataDisplayState();
+class SensorData {
+  final String id;
+  final DateTime date;
+  final String time;
+  final double temperature;
+  final double humidity;
+  final String gas;
+
+  SensorData({
+    required this.id,
+    required this.date,
+    required this.time,
+    required this.temperature,
+    required this.humidity,
+    required this.gas,
+  });
+
+  factory SensorData.fromJson(Map<String, dynamic> json) {
+    return SensorData(
+      id: json['id'],
+      date: DateTime.parse(json['date']),
+      time: json['time'],
+      temperature: double.parse(json['temperature']),
+      humidity: double.parse(json['humidity']),
+      gas: json['gas'] ?? 'Unknown',
+    );
+  }
 }
 
-class _tempDataDisplayState extends State<tempDataDisplay> {
+class ApiService {
+  final String apiUrl =
+      'http://127.0.0.1/esp32_mq2_dht11/api/api_esp32_data.php';
+
+  Future<List<SensorData>> fetchSensorData() async {
+    final response = await http.get(Uri.parse(apiUrl));
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((item) => SensorData.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load data');
+    }
+  }
+}
+
+class SensorDataDisplay extends StatefulWidget {
+  @override
+  _SensorDataDisplayState createState() => _SensorDataDisplayState();
+}
+
+class _SensorDataDisplayState extends State<SensorDataDisplay> {
   late SensorData latestSensorData;
   bool isLoading = true;
   late Timer timer;
-  String statusMessage = ''; // Variable to hold the status message
 
   @override
   void initState() {
     super.initState();
     fetchLatestSensorData();
-    timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    timer = Timer.periodic(Duration(seconds: 5), (timer) {
       fetchLatestSensorData();
     });
   }
@@ -52,17 +95,6 @@ class _tempDataDisplayState extends State<tempDataDisplay> {
         setState(() {
           latestSensorData = sensorDataList.first;
           isLoading = false;
-
-          // Set status message based on temperature value
-          if (latestSensorData.temperature < 25) {
-            statusMessage = 'อุณหภูมิต่ำ';
-          } else if (latestSensorData.temperature < 50) {
-            statusMessage = 'อุณหภูมิปานกลาง';
-          } else if (latestSensorData.temperature < 75) {
-            statusMessage = 'อุณหภูมิสูง';
-          } else {
-            statusMessage = 'อันตราย';
-          }
         });
       }
     } catch (error) {
@@ -77,7 +109,7 @@ class _tempDataDisplayState extends State<tempDataDisplay> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Temperature Sensor Data Display'),
+        title: Text('Sensor Data Display'),
       ),
       body: Center(
         child: isLoading
@@ -88,32 +120,30 @@ class _tempDataDisplayState extends State<tempDataDisplay> {
                   SfRadialGauge(
                     axes: <RadialAxis>[
                       RadialAxis(
-                        minimum: 0,
-                        maximum: 100,
+                        minimum: -20,
+                        maximum: 50,
                         ranges: <GaugeRange>[
                           GaugeRange(
-                              startValue: 0, endValue: 25, color: Colors.blue),
+                              startValue: -20, endValue: 0, color: Colors.blue),
                           GaugeRange(
-                              startValue: 25,
-                              endValue: 50,
-                              color: Colors.green),
+                              startValue: 0, endValue: 30, color: Colors.green),
                           GaugeRange(
-                              startValue: 50, endValue: 100, color: Colors.red),
+                              startValue: 30, endValue: 50, color: Colors.red),
                         ],
                         pointers: <GaugePointer>[
                           NeedlePointer(
-                            value: latestSensorData
-                                .temperature, // Display temperature
-                            enableAnimation: true,
+                            value: latestSensorData.temperature,
+                            enableAnimation: true, // เปิดใช้งาน animation
                             animationType: AnimationType.ease,
-                            animationDuration: 1000,
+                            animationDuration:
+                                1000, // ระยะเวลา animation (มิลลิวินาที)
                           ),
                         ],
                         annotations: <GaugeAnnotation>[
                           GaugeAnnotation(
                             widget: Container(
                               child: Text(
-                                '${latestSensorData.temperature}°C', // Show temperature in degrees Celsius
+                                '${latestSensorData.temperature}°C',
                                 style: TextStyle(
                                     fontSize: 25, fontWeight: FontWeight.bold),
                               ),
@@ -124,14 +154,6 @@ class _tempDataDisplayState extends State<tempDataDisplay> {
                         ],
                       ),
                     ],
-                  ),
-                  SizedBox(height: 20), // Add space
-                  Text(
-                    statusMessage, // Display status message
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                 ],
               ),

@@ -8,7 +8,7 @@
 
 const char* ssid = "cotkza";        // Your WiFi SSID
 const char* password = "12345678";  // Your WiFi Password
-const char* serverName = "http://192.168.100.110/esp32_mq2_dht11/api/insert_data.php";  // Your PHP script URL
+const char* serverName = "http://192.168.100.165/esp32_mq2_dht11/api/insert_data.php";  // Your PHP script URL
 
 DHT dht(DHTPIN, DHTTYPE); // Create DHT object
 
@@ -35,7 +35,7 @@ void loop() {
     int gasValueRaw = analogRead(MQ2_PIN);
 
     // Convert gas value to percentage
-    int gasValue = (gasValueRaw * 100) / 1023;
+    int gasValue = (gasValueRaw / 33);
 
     // Send data to PHP script
     sendToServer(temperature, humidity, gasValue);

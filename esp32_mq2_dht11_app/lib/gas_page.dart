@@ -1,7 +1,8 @@
-import 'dart:async'; // Import for Timer
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'api.dart'; // Import your API service
-import 'sensor_data.dart'; // Import your sensor data model
+import 'package:syncfusion_flutter_gauges/gauges.dart';
+import 'api.dart';
+import 'sensor_data.dart';
 
 void main() {
   runApp(MyApp());
@@ -11,86 +12,68 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gauge Example',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: GasPage(),
+      debugShowCheckedModeBanner: false,
+      home: GasDataDisplay(), // Updated class name for clarity
     );
   }
 }
 
-class GasPage extends StatefulWidget {
+class GasDataDisplay extends StatefulWidget {
   @override
-  _GasPageState createState() => _GasPageState();
+  _GasDataDisplayState createState() => _GasDataDisplayState();
 }
 
-class _GasPageState extends State<GasPage> {
-  double _currentGasValue = 50; // Initial value for gas
-  Timer? _timer;
+class _GasDataDisplayState extends State<GasDataDisplay> {
+  late SensorData latestSensorData;
+  bool isLoading = true;
+  late Timer timer;
+  String statusMessage = ''; // Variable to hold status message
 
   @override
   void initState() {
     super.initState();
-    fetchLatestGasValue(); // Fetch initial gas value
-    // Fetch gas data every second
-    _timer = Timer.periodic(
-      Duration(seconds: 1),
-      (Timer t) => fetchLatestGasValue(),
-    );
+    fetchLatestSensorData(); // Initial data fetch
+    timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      fetchLatestSensorData(); // Periodic data fetch
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel(); // Cancel the timer when the widget is disposed
+    timer.cancel(); // Cancel timer to prevent memory leaks
     super.dispose();
   }
 
-  // Fetch latest gas value from API
-  Future<void> fetchLatestGasValue() async {
+  Future<void> fetchLatestSensorData() async {
     try {
       List<SensorData> sensorDataList = await ApiService().fetchSensorData();
       if (sensorDataList.isNotEmpty) {
-        // Convert gas value from String to double
-        double latestGasValue =
-            double.tryParse(sensorDataList.first.gas) ?? 0.0;
-        // Ensure the value does not exceed 100
-        if (latestGasValue > 100) {
-          latestGasValue = 100;
-        }
-        // Check if the new value is different before updating
-        if (latestGasValue != _currentGasValue) {
-          setState(() {
-            _currentGasValue = latestGasValue; // Update the current gas value
-          });
-        }
+        setState(() {
+          latestSensorData = sensorDataList.first;
+          isLoading = false;
+
+          // Set status message based on gas level
+          statusMessage = _getGasStatus(latestSensorData.gas);
+        });
       }
-    } catch (e) {
-      print('Error fetching gas data: $e');
+    } catch (error) {
+      setState(() {
+        isLoading = false; // Update loading state in case of error
+      });
+      print('Error fetching sensor data: $error');
     }
   }
 
-  String _getLabel(double value) {
-    if (value <= 25) {
-      return 'แก๊สน้อย';
-    } else if (value <= 50) {
-      return 'ปานกลาง';
-    } else if (value <= 75) {
-      return 'ค่อนข้างมาก';
+  String _getGasStatus(double gas) {
+    // Helper method to determine gas status message
+    if (gas < 25) {
+      return 'แก๊สน้อย'; // Low gas
+    } else if (gas < 50) {
+      return 'ปานกลาง'; // Medium gas
+    } else if (gas < 80) {
+      return 'ปานกลางค่อนข้างมาก'; // High gas
     } else {
-      return 'อันตราย';
-    }
-  }
-
-  Color _getColor(double value) {
-    if (value <= 25) {
-      return Colors.green;
-    } else if (value <= 50) {
-      return Colors.yellow;
-    } else if (value <= 75) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
+      return 'อันตราย'; // Dangerous gas
     }
   }
 
@@ -98,83 +81,67 @@ class _GasPageState extends State<GasPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Real-time Gas Gauge'),
+        title: Text('GAS Sensor Data Display'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Gas Value: ${_currentGasValue.toInt()} (${_getLabel(_currentGasValue)})',
-              style: TextStyle(fontSize: 24),
-            ),
-            Slider(
-              value: _currentGasValue,
-              min: 0, // Changed to 0 for better representation
-              max: 100, // Ensure the maximum is 100
-              divisions: 100, // Divisions for better granularity
-              label: _currentGasValue.toStringAsFixed(0),
-              onChanged: (double value) {
-                setState(() {
-                  _currentGasValue = value.clamp(
-                      0, 100); // Ensure value is clamped between 0 and 100
-                });
-              },
-            ),
-            SizedBox(height: 20),
-            CustomPaint(
-              size: Size(200, 200),
-              painter:
-                  GaugePainter(_currentGasValue, _getColor(_currentGasValue)),
+      body: Center(
+        child: isLoading
+            ? CircularProgressIndicator() // Show loading indicator
+            : _buildGasDisplay(), // Call method to build gas display
+      ),
+    );
+  }
+
+  Widget _buildGasDisplay() {
+    // Method to build the gas display widget
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SfRadialGauge(
+          axes: <RadialAxis>[
+            RadialAxis(
+              minimum: 0,
+              maximum: 100,
+              ranges: <GaugeRange>[
+                GaugeRange(startValue: 0, endValue: 25, color: Colors.blue),
+                GaugeRange(startValue: 25, endValue: 50, color: Colors.green),
+                GaugeRange(startValue: 50, endValue: 100, color: Colors.red),
+              ],
+              pointers: <GaugePointer>[
+                NeedlePointer(
+                  value: latestSensorData.gas, // Directly use gas value
+                  enableAnimation: true,
+                  animationType: AnimationType.ease,
+                  animationDuration: 1000,
+                ),
+              ],
+              annotations: <GaugeAnnotation>[
+                GaugeAnnotation(
+                  widget: Container(
+                    child: Text(
+                      latestSensorData.gas
+                          .toString(), // Show gas level as string
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  angle: 90,
+                  positionFactor: 0.5,
+                ),
+              ],
             ),
           ],
         ),
-      ),
+        SizedBox(height: 20), // Add space between elements
+        Text(
+          statusMessage, // Display status message
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
-  }
-}
-
-class GaugePainter extends CustomPainter {
-  final double value;
-  final Color color;
-
-  GaugePainter(this.value, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    double centerX = size.width / 2;
-    double centerY = size.height / 2;
-    double radius = size.width / 2;
-
-    Paint outerCircle = Paint()
-      ..color = Colors.grey[300]!
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20;
-
-    Paint valueArc = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 20
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(Offset(centerX, centerY), radius, outerCircle);
-
-    double angle = (value / 100) *
-        3.6 *
-        (3.1416 / 180); // Calculate the angle for the gauge
-
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(centerX, centerY), radius: radius),
-      -3.1416 / 2, // Start at the top of the circle
-      angle,
-      false,
-      valueArc,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
   }
 }
